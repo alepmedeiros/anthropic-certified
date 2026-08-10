@@ -12,7 +12,10 @@ CREATE TABLE IF NOT EXISTS questions (
   option_b TEXT NOT NULL,
   option_c TEXT NOT NULL,
   option_d TEXT NOT NULL,
-  correct_option CHAR(1) NOT NULL,  -- 'a'..'d' — NUNCA enviado ao cliente antes da correção
+  correct_option CHAR(1) NOT NULL,  -- 'a'..'d' — NUNCA enviado ao cliente antes da correção. Para question_type='multi', mantém a 1ª letra correta como placeholder; a correção real usa correct_options.
+  question_type TEXT NOT NULL DEFAULT 'single',  -- 'single' | 'multi' — a prova real mistura os dois formatos
+  correct_options TEXT,  -- JSON array (ex. '["b","d"]'), só usado quando question_type='multi' — NUNCA enviado ao cliente antes da correção
+  select_count INTEGER NOT NULL DEFAULT 1,  -- quantas respostas selecionar; seguro expor ao cliente (não revela quais)
   explanation TEXT NOT NULL,
   reinforce TEXT NOT NULL
 );

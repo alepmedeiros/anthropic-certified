@@ -8,7 +8,7 @@ const router = Router();
 // Regra de ouro: nunca usar SELECT * aqui — correct_option/explanation/reinforce
 // jamais podem sair antes da correção.
 const SAFE_QUESTION_COLUMNS =
-  "id, domain_id, scenario, option_a, option_b, option_c, option_d";
+  "id, domain_id, scenario, option_a, option_b, option_c, option_d, question_type, select_count";
 
 router.get("/domains", requireAuth, (_req, res) => {
   const domains = db.prepare("SELECT id, name, weight FROM domains ORDER BY id ASC").all();

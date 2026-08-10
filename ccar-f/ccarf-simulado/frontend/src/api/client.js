@@ -33,10 +33,14 @@ export const api = {
   getFullExam: () => request("/exam/full"),
   startAttempt: (mode, domainId) =>
     request("/exam/attempt", { method: "POST", body: JSON.stringify({ mode, domain_id: domainId }) }),
-  answer: (attemptId, questionId, chosenOption) =>
+  answer: (attemptId, questionId, choice) =>
     request(`/exam/attempt/${attemptId}/answer`, {
       method: "POST",
-      body: JSON.stringify({ question_id: questionId, chosen_option: chosenOption }),
+      body: JSON.stringify(
+        Array.isArray(choice)
+          ? { question_id: questionId, chosen_options: choice }
+          : { question_id: questionId, chosen_option: choice }
+      ),
     }),
   finish: (attemptId) => request(`/exam/attempt/${attemptId}/finish`, { method: "POST" }),
   getProgress: () => request("/progress"),

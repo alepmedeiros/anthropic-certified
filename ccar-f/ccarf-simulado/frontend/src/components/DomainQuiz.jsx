@@ -14,7 +14,7 @@ export default function DomainQuiz({ domainId, onDone }) {
   const [attemptId, setAttemptId] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [index, setIndex] = useState(0);
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState([]);
   const [feedback, setFeedback] = useState(null);
   const [correctCount, setCorrectCount] = useState(0);
   const [finished, setFinished] = useState(false);
@@ -38,12 +38,12 @@ export default function DomainQuiz({ domainId, onDone }) {
   }, [domainId]);
 
   const current = questions[index];
+  const isMulti = current?.question_type === "multi";
+  const selectCount = current?.select_count ?? 1;
 
-  const answer = async (letter) => {
-    if (feedback) return;
-    setSelected(letter);
+  const submitAnswer = async (letters) => {
     try {
-      const result = await api.answer(attemptId, current.id, letter);
+      const result = await api.answer(attemptId, current.id, isMulti ? letters : letters[0]);
       if (result.is_correct) setCorrectCount((c) => c + 1);
       setFeedback(result);
     } catch (err) {
@@ -51,10 +51,22 @@ export default function DomainQuiz({ domainId, onDone }) {
     }
   };
 
+  const toggleOption = (letter) => {
+    if (feedback) return;
+    if (!isMulti) {
+      setSelected([letter]);
+      submitAnswer([letter]);
+      return;
+    }
+    setSelected((prev) =>
+      prev.includes(letter) ? prev.filter((l) => l !== letter) : prev.length < selectCount ? [...prev, letter] : prev
+    );
+  };
+
   const next = async () => {
     if (index + 1 < questions.length) {
       setIndex(index + 1);
-      setSelected(null);
+      setSelected([]);
       setFeedback(null);
     } else {
       try {
@@ -99,23 +111,32 @@ export default function DomainQuiz({ domainId, onDone }) {
       <div style={{ ...cardStyle, marginBottom: "1rem" }}>
         <div style={{ fontSize: "14px", lineHeight: 1.6 }}>{current.scenario}</div>
       </div>
+      {isMulti && !feedback && (
+        <div style={{ fontSize: "12px", color: colors.textDim, marginBottom: "8px" }}>
+          Select {selectCount} responses ({selected.length}/{selectCount} chosen)
+        </div>
+      )}
       <div>
         {toOptions(current).map(({ letter, text }) => {
           let bg = colors.card;
           let border = colors.border;
+          const isSelected = selected.includes(letter);
           if (feedback) {
-            if (feedback.is_correct && letter === selected) {
+            if (feedback.is_correct && isSelected) {
               bg = colors.ok;
               border = colors.accent;
-            } else if (!feedback.is_correct && letter === selected) {
+            } else if (!feedback.is_correct && isSelected) {
               bg = colors.bad;
               border = colors.red;
             }
+          } else if (isMulti && isSelected) {
+            bg = colors.ok;
+            border = colors.accent;
           }
           return (
             <button
               key={letter}
-              onClick={() => answer(letter)}
+              onClick={() => toggleOption(letter)}
               style={{
                 display: "block",
                 width: "100%",
@@ -131,11 +152,25 @@ export default function DomainQuiz({ domainId, onDone }) {
                 cursor: feedback ? "default" : "pointer",
               }}
             >
+              {isMulti ? (isSelected ? "☑ " : "☐ ") : ""}
               {text}
             </button>
           );
         })}
       </div>
+      {isMulti && !feedback && (
+        <button
+          onClick={() => submitAnswer(selected)}
+          disabled={selected.length !== selectCount}
+          style={{
+            ...primaryButton,
+            opacity: selected.length !== selectCount ? 0.5 : 1,
+            cursor: selected.length !== selectCount ? "default" : "pointer",
+          }}
+        >
+          submit answer
+        </button>
+      )}
       {feedback && (
         <div style={{ ...cardStyle, marginTop: "0.5rem" }}>
           <div style={{ fontSize: "13px", marginBottom: "6px", color: feedback.is_correct ? colors.accent : colors.red }}>

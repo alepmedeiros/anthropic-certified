@@ -34,17 +34,33 @@ export default function FullExam({ onDone }) {
   }, []);
 
   const current = questions[index];
-  const chosen = current ? selections[current.id] : undefined;
+  const isMulti = current?.question_type === "multi";
+  const selectCount = current?.select_count ?? 1;
+  const chosen = current ? selections[current.id] ?? [] : [];
   const isLocked = current ? Boolean(submitted[current.id]) : false;
+  const isAnswerComplete = chosen.length === selectCount;
 
   const select = (letter) => {
     if (isLocked) return;
-    setSelections((prev) => ({ ...prev, [current.id]: letter }));
+    if (!isMulti) {
+      setSelections((prev) => ({ ...prev, [current.id]: [letter] }));
+      return;
+    }
+    setSelections((prev) => {
+      const prevChosen = prev[current.id] ?? [];
+      const nextChosen = prevChosen.includes(letter)
+        ? prevChosen.filter((l) => l !== letter)
+        : prevChosen.length < selectCount
+        ? [...prevChosen, letter]
+        : prevChosen;
+      return { ...prev, [current.id]: nextChosen };
+    });
   };
 
   const commitCurrent = async () => {
     if (submitted[current.id]) return;
-    await api.answer(attemptId, current.id, selections[current.id]);
+    const choice = selections[current.id] ?? [];
+    await api.answer(attemptId, current.id, isMulti ? choice : choice[0]);
     setSubmitted((prev) => ({ ...prev, [current.id]: true }));
   };
 
@@ -84,31 +100,40 @@ export default function FullExam({ onDone }) {
       <div style={{ ...cardStyle, marginBottom: "1rem" }}>
         <div style={{ fontSize: "14px", lineHeight: 1.6 }}>{current.scenario}</div>
       </div>
+      {isMulti && (
+        <div style={{ fontSize: "12px", color: colors.textDim, marginBottom: "8px" }}>
+          Select {selectCount} responses ({chosen.length}/{selectCount} chosen)
+        </div>
+      )}
       <div>
-        {toOptions(current).map(({ letter, text }) => (
-          <button
-            key={letter}
-            onClick={() => select(letter)}
-            disabled={isLocked}
-            style={{
-              display: "block",
-              width: "100%",
-              textAlign: "left",
-              background: chosen === letter ? colors.ok : colors.card,
-              border: `1px solid ${chosen === letter ? colors.accent : colors.border}`,
-              color: colors.text,
-              borderRadius: "8px",
-              padding: "10px 14px",
-              marginBottom: "8px",
-              fontSize: "13px",
-              fontFamily: "inherit",
-              cursor: isLocked ? "default" : "pointer",
-              opacity: isLocked && chosen !== letter ? 0.6 : 1,
-            }}
-          >
-            {text}
-          </button>
-        ))}
+        {toOptions(current).map(({ letter, text }) => {
+          const isSelected = chosen.includes(letter);
+          return (
+            <button
+              key={letter}
+              onClick={() => select(letter)}
+              disabled={isLocked}
+              style={{
+                display: "block",
+                width: "100%",
+                textAlign: "left",
+                background: isSelected ? colors.ok : colors.card,
+                border: `1px solid ${isSelected ? colors.accent : colors.border}`,
+                color: colors.text,
+                borderRadius: "8px",
+                padding: "10px 14px",
+                marginBottom: "8px",
+                fontSize: "13px",
+                fontFamily: "inherit",
+                cursor: isLocked ? "default" : "pointer",
+                opacity: isLocked && !isSelected ? 0.6 : 1,
+              }}
+            >
+              {isMulti ? (isSelected ? "☑ " : "☐ ") : ""}
+              {text}
+            </button>
+          );
+        })}
       </div>
       <div style={{ display: "flex", gap: "8px", marginTop: "0.5rem" }}>
         <button
@@ -129,16 +154,16 @@ export default function FullExam({ onDone }) {
         </button>
         <button
           onClick={goNext}
-          disabled={chosen === undefined || submitting}
+          disabled={!isAnswerComplete || submitting}
           style={{
-            background: chosen === undefined || submitting ? colors.border : colors.accent,
+            background: !isAnswerComplete || submitting ? colors.border : colors.accent,
             border: "none",
-            color: chosen === undefined || submitting ? colors.textDimmer : colors.accentDark,
+            color: !isAnswerComplete || submitting ? colors.textDimmer : colors.accentDark,
             borderRadius: "6px",
             padding: "8px 16px",
             fontSize: "13px",
             fontWeight: 600,
-            cursor: chosen === undefined || submitting ? "default" : "pointer",
+            cursor: !isAnswerComplete || submitting ? "default" : "pointer",
             fontFamily: "inherit",
           }}
         >
