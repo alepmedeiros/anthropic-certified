@@ -218,6 +218,134 @@ const QUESTIONS = [
       "Reliable handoffs pass a structured summary of decisions made and remaining objectives — not the raw history (expensive and noisy) nor nothing at all (loses progress).",
     reinforce: "Review: agent-to-agent handoff patterns, D5.",
   },
+  {
+    id: "d1-4",
+    domain: "D1",
+    scenario:
+      "You are implementing the control flow for an agentic loop using the Claude Agent SDK. After sending a request, you inspect the response's stop_reason field. What should determine whether the loop continues to another iteration?",
+    options: [
+      "Continue when stop_reason is 'tool_use'; terminate when it is 'end_turn'",
+      "Continue until the assistant's text content mentions the word 'done'",
+      "Continue for a fixed number of iterations regardless of stop_reason",
+      "Terminate as soon as any tool is called, to keep latency low",
+    ],
+    correct: "a",
+    explanation:
+      "The documented control flow checks stop_reason: 'tool_use' means Claude wants to call a tool and the loop continues; 'end_turn' means the model is done. Parsing text content or using a fixed iteration cap as the primary mechanism are explicit anti-patterns.",
+    reinforce: "Review: Task Statement 1.1, agentic loop lifecycle and stop_reason handling.",
+  },
+  {
+    id: "d1-5",
+    domain: "D1",
+    scenario:
+      "A coordinator agent needs to spawn subagents to research a topic. What must be true for this to work correctly with the Claude Agent SDK?",
+    options: [
+      "The coordinator's allowedTools must include 'Task', and each subagent must receive its needed context explicitly in its prompt",
+      "Subagents automatically inherit the coordinator's full conversation history",
+      "Only one subagent can be spawned per coordinator turn",
+      "Subagents share a single memory space with the coordinator by default",
+    ],
+    correct: "a",
+    explanation:
+      "Spawning subagents requires 'Task' in the coordinator's allowedTools. Subagents run with isolated context and do NOT automatically inherit the coordinator's history — required context must be passed explicitly in the prompt.",
+    reinforce: "Review: Task Statement 1.3, Task tool and explicit context passing.",
+  },
+  {
+    id: "d2-3",
+    domain: "D2",
+    scenario:
+      "An MCP tool occasionally fails. Some failures are due to a temporary network timeout, others because the requested refund exceeds a policy threshold. Both currently return a generic 'Operation failed' message. What should change?",
+    options: [
+      "Return structured error metadata: an errorCategory (transient/validation/permission/business), an isRetryable boolean, and a human-readable description",
+      "Always retry three times regardless of error type before giving up",
+      "Suppress the error and return an empty successful result instead",
+      "Terminate the entire agent session whenever any tool call fails",
+    ],
+    correct: "a",
+    explanation:
+      "Uniform 'Operation failed' messages prevent the agent from making appropriate recovery decisions. Structured error responses with errorCategory and isRetryable let the agent distinguish transient errors (worth retrying) from business/policy errors (explain to the user, don't retry).",
+    reinforce: "Review: Task Statement 2.2, MCP isError pattern and structured error responses.",
+  },
+  {
+    id: "d2-4",
+    domain: "D2",
+    scenario:
+      "You want to guarantee that a specific extraction tool, extract_metadata, is always the first tool called before any enrichment tools run, regardless of what the model might otherwise choose. Which tool_choice configuration achieves this?",
+    options: [
+      "tool_choice: 'auto'",
+      "tool_choice: 'any'",
+      "tool_choice: {'type': 'tool', 'name': 'extract_metadata'} (forced selection)",
+      "Omitting tool_choice entirely",
+    ],
+    correct: "c",
+    explanation:
+      "Forced tool selection guarantees the model calls that specific named tool. 'auto' lets the model choose freely (or return text); 'any' guarantees a tool call but not which one.",
+    reinforce: "Review: Task Statement 4.3, tool_choice options (auto/any/forced).",
+  },
+  {
+    id: "d3-4",
+    domain: "D3",
+    scenario:
+      "A new team member joins the project and doesn't receive the team's shared Claude Code instructions, even though other developers do. Investigation shows the instructions were placed in their personal configuration. Where should shared, version-controlled team instructions live instead?",
+    options: [
+      "~/.claude/CLAUDE.md (user-level)",
+      "The project-level CLAUDE.md, committed to the repository",
+      "A private note sent to each new hire individually",
+      "Environment variables on each developer's machine",
+    ],
+    correct: "b",
+    explanation:
+      "User-level CLAUDE.md (~/.claude/CLAUDE.md) applies only to that individual and is not shared via version control. Project-level CLAUDE.md, committed to the repo, is what every team member receives automatically.",
+    reinforce: "Review: Task Statement 3.1, CLAUDE.md hierarchy (user/project/directory).",
+  },
+  {
+    id: "d3-5",
+    domain: "D3",
+    scenario:
+      "Your codebase has test files scattered across many directories (e.g., Button.test.tsx next to Button.tsx), and you want the same testing conventions applied automatically regardless of location. What is the most maintainable mechanism?",
+    options: [
+      "A CLAUDE.md file placed in every subdirectory that contains a test file",
+      "A single monolithic root CLAUDE.md listing every convention under separate headers",
+      "A .claude/rules/ file with YAML frontmatter specifying a glob pattern like paths: ['**/*.test.tsx']",
+      "Renaming all test files to live in one central folder",
+    ],
+    correct: "c",
+    explanation:
+      ".claude/rules/ with glob-pattern path scoping applies conventions by file pattern regardless of directory location — exactly suited for conventions (like test standards) that span many directories. Directory-bound CLAUDE.md files can't handle files spread across the codebase.",
+    reinforce: "Review: Task Statement 3.3, path-specific rules with glob patterns.",
+  },
+  {
+    id: "d4-4",
+    domain: "D4",
+    scenario:
+      "Your team wants to move two workflows to the Message Batches API for its 50% cost savings: (1) a blocking pre-merge check developers wait on, and (2) an overnight technical-debt report. Which is the correct evaluation?",
+    options: [
+      "Move both to batch processing — the cost savings apply universally",
+      "Move only the overnight report to batch; keep the pre-merge check on the real-time API",
+      "Keep both on the real-time API to avoid any batch complexity",
+      "Move only the pre-merge check to batch, since it runs more frequently",
+    ],
+    correct: "b",
+    explanation:
+      "The Batches API can take up to 24 hours with no latency SLA — fine for a non-blocking overnight report, unacceptable for a blocking pre-merge check developers are actively waiting on.",
+    reinforce: "Review: Task Statement 4.5, Message Batches API — when it is and isn't appropriate.",
+  },
+  {
+    id: "d5-3",
+    domain: "D5",
+    scenario:
+      "A customer support agent escalates a request to a human only when its self-reported confidence score drops below a set threshold. Production data shows this agent is often highly 'confident' while handling cases it actually mishandles. What does the exam guide identify as the core issue with this design?",
+    options: [
+      "Self-reported LLM confidence scores are poorly calibrated and are an unreliable proxy for actual case complexity",
+      "The confidence threshold was simply set too low and needs to be raised",
+      "Confidence-based escalation always outperforms explicit criteria",
+      "The agent needs a larger context window to assess confidence accurately",
+    ],
+    correct: "a",
+    explanation:
+      "The guide explicitly calls out self-reported confidence as an unreliable signal for escalation — the model can be confidently wrong. The recommended fix is explicit escalation criteria with few-shot examples, not tuning a confidence threshold.",
+    reinforce: "Review: Task Statement 5.2, escalation triggers vs. unreliable confidence/sentiment proxies.",
+  },
 ];
 
 const insertDomain = db.prepare(
