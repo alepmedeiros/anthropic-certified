@@ -51,11 +51,11 @@ router.post("/exam/attempt", requireAuth, (req: AuthedRequest, res) => {
 
 router.post("/exam/attempt/:id/answer", requireAuth, (req: AuthedRequest, res) => {
   const attemptId = Number(req.params.id);
-  const { question_id, chosen_option } = req.body ?? {};
+  const { question_id, chosen_option, chosen_options } = req.body ?? {};
 
   if (!Number.isInteger(attemptId)) return res.status(400).json({ error: "Invalid attempt id" });
-  if (typeof question_id !== "string" || !VALID_OPTIONS.has(chosen_option)) {
-    return res.status(400).json({ error: "question_id and chosen_option (a-d) are required" });
+  if (typeof question_id !== "string" || !question_id) {
+    return res.status(400).json({ error: "question_id is required" });
   }
 
   const attempt = getOwnedAttempt(attemptId, req.userId!);
@@ -63,21 +63,57 @@ router.post("/exam/attempt/:id/answer", requireAuth, (req: AuthedRequest, res) =
   if (attempt.finished_at) return res.status(409).json({ error: "Attempt already finished" });
 
   const question = db
-    .prepare("SELECT id, domain_id, correct_option, explanation, reinforce FROM questions WHERE id = ?")
+    .prepare(
+      "SELECT id, domain_id, question_type, correct_option, correct_options, select_count, explanation, reinforce FROM questions WHERE id = ?"
+    )
     .get(question_id) as
-    | { id: string; domain_id: string; correct_option: string; explanation: string; reinforce: string }
+    | {
+        id: string;
+        domain_id: string;
+        question_type: "single" | "multi";
+        correct_option: string;
+        correct_options: string | null;
+        select_count: number;
+        explanation: string;
+        reinforce: string;
+      }
     | undefined;
   if (!question) return res.status(404).json({ error: "Question not found" });
   if (attempt.mode === "domain_practice" && question.domain_id !== attempt.domain_id) {
     return res.status(400).json({ error: "Question does not belong to this attempt's domain" });
   }
 
-  const isCorrect = chosen_option === question.correct_option;
+  // The question's own type is the source of truth for how to grade it — never trust a
+  // client-supplied type, only which field(s) it populated.
+  let isCorrect: boolean;
+  let storedChoice: string;
+
+  if (question.question_type === "multi") {
+    if (!Array.isArray(chosen_options) || chosen_options.length === 0) {
+      return res.status(400).json({ error: "chosen_options (array of a-d) is required for this question" });
+    }
+    const chosenSet = new Set(chosen_options);
+    if (chosenSet.size !== chosen_options.length || [...chosenSet].some((o) => !VALID_OPTIONS.has(o as string))) {
+      return res.status(400).json({ error: "chosen_options must be unique letters a-d" });
+    }
+    if (chosenSet.size !== question.select_count) {
+      return res.status(400).json({ error: `This question requires exactly ${question.select_count} selections` });
+    }
+    const correctSet = new Set(JSON.parse(question.correct_options ?? "[]") as string[]);
+    isCorrect = chosenSet.size === correctSet.size && [...chosenSet].every((o) => correctSet.has(o as string));
+    storedChoice = [...chosenSet].sort().join(",");
+  } else {
+    if (!VALID_OPTIONS.has(chosen_option)) {
+      return res.status(400).json({ error: "chosen_option (a-d) is required for this question" });
+    }
+    isCorrect = chosen_option === question.correct_option;
+    storedChoice = chosen_option;
+  }
 
   try {
     db.prepare(
       "INSERT INTO attempt_answers (attempt_id, question_id, chosen_option, is_correct) VALUES (?, ?, ?, ?)"
-    ).run(attemptId, question_id, chosen_option, isCorrect ? 1 : 0);
+    ).run(attemptId, question_id, storedChoice, isCorrect ? 1 : 0);
   } catch {
     return res.status(409).json({ error: "Question already answered in this attempt" });
   }
