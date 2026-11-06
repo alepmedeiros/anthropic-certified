@@ -25,3 +25,6 @@ if (!existingColumns.has("correct_options")) {
 if (!existingColumns.has("select_count")) {
   db.exec("ALTER TABLE questions ADD COLUMN select_count INTEGER NOT NULL DEFAULT 1");
 }
+if (!existingColumns.has("scenario_tag")) {
+  db.exec("ALTER TABLE questions ADD COLUMN scenario_tag TEXT");
+}

@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS questions (
   question_type TEXT NOT NULL DEFAULT 'single',  -- 'single' | 'multi' — a prova real mistura os dois formatos
   correct_options TEXT,  -- JSON array (ex. '["b","d"]'), só usado quando question_type='multi' — NUNCA enviado ao cliente antes da correção
   select_count INTEGER NOT NULL DEFAULT 1,  -- quantas respostas selecionar; seguro expor ao cliente (não revela quais)
+  scenario_tag TEXT,  -- 'customer_support' | 'code_generation' | 'multi_agent_research' | 'developer_productivity' | 'cicd' | 'structured_extraction' | null (genérica)
   explanation TEXT NOT NULL,
   reinforce TEXT NOT NULL
 );

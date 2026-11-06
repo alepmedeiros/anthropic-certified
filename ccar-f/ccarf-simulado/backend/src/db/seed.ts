@@ -493,6 +493,672 @@ const QUESTIONS = [
     reinforce: "Review: Task Statement 1.7, session resumption and handling stale context.",
   },
   {
+    id: "d1-15",
+    domain: "D1",
+    scenario:
+      "An agent calls a lookup_inventory tool and receives a result. On the next turn, before deciding what to do, the agent re-calls lookup_inventory with the same arguments because it 'forgot' the result. Investigation shows the tool's output was discarded after being displayed to the user, and never added back into the conversation sent to the model. What is the fix?",
+    options: [
+      "Append the tool result to the conversation history so it's included in the next request to Claude",
+      "Increase max_tokens so the model can hold more in its 'working memory'",
+      "Ask the model to summarize the tool result immediately in its own words",
+      "Switch to a model with a longer context window",
+    ],
+    correct: "a",
+    explanation:
+      "Tool results must be appended to the conversation history between iterations of the agentic loop — this is what lets the model reason about them on the next turn. If a result is displayed to the user but never sent back to the model, the model has no way to know it happened.",
+    reinforce: "Review: Task Statement 1.1, appending tool results to conversation history between loop iterations.",
+  },
+  {
+    id: "d1-16",
+    domain: "D1",
+    scenario:
+      "Two designs are proposed for a support agent: Design A hard-codes a decision tree ('if the message contains refund, call process_refund; else if it contains shipping, call track_shipment; ...') that runs before Claude sees the message. Design B gives Claude the tools directly and lets it decide, per stop_reason, which tool (if any) to call based on the full conversation. Which design follows the agentic loop pattern the exam guide describes?",
+    options: [
+      "Design A, because deterministic keyword routing is more predictable",
+      "Design B, because the model reasons about which tool to call next based on context, rather than following a pre-configured sequence",
+      "Both are equivalent implementations of the same pattern",
+      "Neither — a true agentic loop requires no tools at all",
+    ],
+    correct: "b",
+    explanation:
+      "The agentic loop lifecycle is built around model-driven decision-making: Claude inspects context and decides which tool (if any) to call, rather than executing a pre-configured decision tree or fixed tool sequence determined before the model sees the request.",
+    reinforce: "Review: Task Statement 1.1, model-driven decision-making vs. pre-configured decision trees.",
+    scenarioTag: "customer_support",
+  },
+  {
+    id: "d1-17",
+    domain: "D1",
+    scenario:
+      "An engineer implements loop termination by scanning the assistant's text output for phrases like 'I'm done' or 'task complete,' and stopping the loop when one is found. In testing, the agent sometimes says something resembling those phrases mid-explanation, terminating the loop prematurely. What is the correct fix?",
+    options: [
+      "Add more phrases to the list of completion signals to catch edge cases",
+      "Replace text-parsing entirely with a check on the response's stop_reason field",
+      "Ask the model to only use the exact phrase 'TASK COMPLETE' in all caps",
+      "Increase the temperature so the model is more consistent about phrasing",
+    ],
+    correct: "b",
+    explanation:
+      "Parsing assistant text content to decide when a loop should terminate is an explicit anti-pattern — natural language is inherently ambiguous. The reliable signal is the structured stop_reason field ('end_turn' means done), not scanning generated text for keywords.",
+    reinforce: "Review: Task Statement 1.1, avoiding natural-language-parsing as a loop termination signal.",
+  },
+  {
+    id: "d1-18",
+    domain: "D1",
+    scenario:
+      "A team sets a hard cap of exactly 3 tool-call iterations for their research agent, assuming most tasks finish by then, and treats hitting the cap as the normal way the loop ends. Complex queries that legitimately need a 5th or 6th tool call get cut off mid-task with incomplete results. What is the architectural issue?",
+    options: [
+      "The cap should simply be raised to a bigger fixed number like 20",
+      "A fixed iteration cap is being used as the primary stopping mechanism instead of stop_reason; a cap should only be a safety backstop, not the expected way most tasks end",
+      "Iteration caps should never be used under any circumstances",
+      "The agent should be given fewer tools so it needs fewer iterations",
+    ],
+    correct: "b",
+    explanation:
+      "A fixed iteration cap as the primary stopping mechanism is an explicit anti-pattern — the loop should normally terminate based on stop_reason == 'end_turn'. A cap is appropriate only as a safety backstop against runaway loops, not as the expected completion signal for legitimate multi-step tasks.",
+    reinforce: "Review: Task Statement 1.1, iteration caps as a backstop, not the primary stopping mechanism.",
+  },
+  {
+    id: "d1-19",
+    domain: "D1",
+    scenario:
+      "During an agentic loop, a tool call fails and returns an error (not a successful result). The stop_reason on that response is still 'tool_use' because the model requested other tool calls too. Should the loop continue, and what should happen to the error?",
+    options: [
+      "The loop should terminate immediately, since a tool failed",
+      "The error result should be appended to the conversation like any other tool result, and the loop continues, letting the model reason about the failure on its next turn",
+      "The error should be hidden from the model so it doesn't get confused",
+      "The whole conversation should restart from the beginning",
+    ],
+    correct: "b",
+    explanation:
+      "stop_reason 'tool_use' means the loop continues regardless of whether the underlying tool call succeeded or failed — the result (success or error) is appended to the conversation history so the model can reason about it and decide how to proceed, such as retrying or informing the user.",
+    reinforce: "Review: Task Statement 1.1, loop continuation and appending results (including errors) to context.",
+  },
+  {
+    id: "d1-20",
+    domain: "D1",
+    type: "multi",
+    scenario:
+      "A team reviewing their agentic loop implementation wants to identify anti-patterns to remove. Which two of the following are explicit anti-patterns for agentic loop control flow? (Select 2 responses)",
+    options: [
+      "Checking the response's stop_reason field to decide whether to continue",
+      "Parsing the assistant's natural-language text content as the primary way to detect task completion",
+      "Appending tool results to the conversation history between iterations",
+      "Using a fixed iteration cap as the primary mechanism for deciding when the loop ends",
+    ],
+    correctOptions: ["b", "d"],
+    explanation:
+      "Parsing free text for completion signals and relying on a fixed iteration count as the primary stop mechanism are both explicit anti-patterns. Checking stop_reason and appending tool results to context are the correct, recommended practices.",
+    reinforce: "Review: Task Statement 1.1, agentic loop anti-patterns.",
+  },
+  {
+    id: "d1-21",
+    domain: "D1",
+    type: "multi",
+    scenario:
+      "Which two practices correctly describe how an agentic loop built with the Claude Agent SDK should be implemented? (Select 2 responses)",
+    options: [
+      "Continue the loop when stop_reason is 'tool_use', and terminate when it is 'end_turn'",
+      "Let Claude decide which tool to call next based on the current conversation context, rather than following a pre-scripted tool sequence",
+      "Determine loop continuation primarily by scanning the assistant's reply for phrases suggesting it has finished",
+      "Cap the loop at a small fixed number of iterations and treat hitting that cap as the normal way most tasks complete",
+    ],
+    correctOptions: ["a", "b"],
+    explanation:
+      "Correct agentic loop control checks stop_reason to decide whether to continue, and relies on the model's own reasoning to select tools dynamically — rather than parsing free text or leaning on a fixed iteration cap as the primary termination signal.",
+    reinforce: "Review: Task Statement 1.1, correct agentic loop implementation practices.",
+  },
+  {
+    id: "d1-22",
+    domain: "D1",
+    scenario:
+      "You're asked to 'add comprehensive tests to a legacy codebase' with no existing test coverage and no documentation of which modules are riskiest. What decomposition approach does the exam guide recommend for this kind of open-ended task?",
+    options: [
+      "Write a single exhaustive prompt instructing Claude to add tests to every file in one pass",
+      "First map the codebase's structure, identify high-impact/high-risk areas, then create a prioritized plan that adapts as dependencies are discovered along the way",
+      "Alphabetize all files and add tests to them in that fixed order",
+      "Skip planning and start writing tests for whichever file is opened first",
+    ],
+    correct: "b",
+    explanation:
+      "For open-ended tasks like adding comprehensive test coverage to an undocumented legacy codebase, the recommended approach is to first map structure and identify high-impact areas, then build a prioritized plan that adapts as dependencies are discovered — a single fixed-order pass or an unplanned start doesn't account for what can only be learned by exploring.",
+    reinforce: "Review: Task Statement 1.6, decomposing open-ended tasks via adaptive, discovery-driven planning.",
+    scenarioTag: "developer_productivity",
+  },
+  {
+    id: "d1-23",
+    domain: "D1",
+    scenario:
+      "A team wants Claude Code to review a pull request that touches both individual file logic and cross-cutting concerns (like a shared interface used across many files). They decide to break the review into a fixed sequence: first a pass analyzing each changed file individually, then a second pass specifically checking cross-file consistency. What kind of decomposition strategy is this?",
+    options: [
+      "Dynamic adaptive decomposition, since the plan changes based on findings",
+      "Prompt chaining — a fixed sequence of predictable steps suited to a well-defined, predictable review structure",
+      "This isn't a form of task decomposition at all, just a single prompt",
+      "An anti-pattern, since reviews should always be done in one single pass",
+    ],
+    correct: "b",
+    explanation:
+      "A fixed sequence of steps known in advance (a per-file pass, then a cross-file integration pass) is prompt chaining — well suited to predictable, well-defined multi-aspect reviews, as opposed to dynamic adaptive decomposition, which is for open-ended work where the next step depends on what's found.",
+    reinforce: "Review: Task Statement 1.6, prompt chaining for predictable multi-aspect reviews.",
+    scenarioTag: "code_generation",
+  },
+  {
+    id: "d1-24",
+    domain: "D1",
+    scenario:
+      "A team writes a fixed 5-step prompt chain for Claude Code to 'investigate why the checkout service is slow': (1) check logs, (2) check database queries, (3) check network calls, (4) check caching, (5) write a report. In practice, step 1 reveals the issue is entirely in a background job unrelated to checkout, but the chain forces steps 2-4 anyway before allowing a report. What is the problem with this design?",
+    options: [
+      "Nothing — following the fixed steps in order ensures thoroughness",
+      "A fixed prompt chain was used for an open-ended investigation task, where the right next step should depend on what's discovered — forcing predetermined steps wastes effort once the actual cause is already found",
+      "The team should have used more steps in the chain to be extra thorough",
+      "The problem is unrelated to task decomposition — it's a tool access issue",
+    ],
+    correct: "b",
+    explanation:
+      "Open-ended investigation, where what to look at next depends on findings, calls for dynamic adaptive decomposition rather than a fixed prompt chain. Forcing predetermined steps regardless of what's discovered wastes effort — exactly the failure mode this scenario shows.",
+    reinforce: "Review: Task Statement 1.6, dynamic decomposition for open-ended investigation vs. rigid prompt chains.",
+    scenarioTag: "developer_productivity",
+  },
+  {
+    id: "d1-25",
+    domain: "D1",
+    scenario:
+      "A team builds an elaborate dynamic decomposition system — Claude generates a fresh investigation plan from scratch at each step — for a task that is actually the same 4 well-defined steps every time (lint, run unit tests, run integration tests, generate a coverage report). What would be a more appropriate, simpler approach?",
+    options: [
+      "Keep the dynamic system, since more flexibility is always better regardless of the task",
+      "Use prompt chaining instead — a fixed sequence fits this predictable, well-defined workflow, and avoids the overhead of regenerating a plan every time",
+      "Remove all structure and let Claude decide everything with no guidance at all",
+      "Run all 4 steps in parallel to save time regardless of dependencies between them",
+    ],
+    correct: "b",
+    explanation:
+      "When a workflow's steps are predictable and well-defined, prompt chaining (a fixed sequence) is the appropriate, simpler choice — building a dynamic decomposition system for a task that doesn't need adaptive planning adds unnecessary overhead without benefit.",
+    reinforce: "Review: Task Statement 1.6, matching decomposition strategy to workflow predictability.",
+    scenarioTag: "cicd",
+  },
+  {
+    id: "d1-26",
+    domain: "D1",
+    scenario:
+      "A database migration script task starts as a predictable, prompt-chained sequence (read schema, generate migration, run migration, verify). Partway through, the verification step reveals unexpected data inconsistencies that require investigating several unrelated tables before the migration can safely proceed. What is the appropriate response?",
+    options: [
+      "Abandon the task entirely, since the original plan no longer applies",
+      "Rigidly continue the original fixed chain, since deviating from the plan is risky",
+      "Adapt: switch to dynamically investigating the newly discovered data inconsistencies before resuming the migration, since the situation is no longer fully predictable",
+      "Restart the entire migration script from scratch with no changes to the approach",
+    ],
+    correct: "c",
+    explanation:
+      "When a predictable, chained task encounters genuinely unexpected findings, the right response is to adapt — dynamically investigating the new information — rather than rigidly following the original plan or abandoning the task outright. Decomposition strategy should match what the situation actually calls for, even mid-task.",
+    reinforce: "Review: Task Statement 1.6, adapting decomposition strategy when a predictable task surfaces unexpected complexity.",
+  },
+  {
+    id: "d1-27",
+    domain: "D1",
+    type: "multi",
+    scenario:
+      "Which two statements correctly describe prompt chaining as a task decomposition strategy? (Select 2 responses)",
+    options: [
+      "It works best for well-defined, predictable workflows where the steps are known in advance",
+      "It generates new subtasks dynamically based on what is discovered at each step",
+      "A code review split into per-file passes plus a final cross-file integration pass is a typical example",
+      "It is always the correct choice regardless of how much the workflow's structure can be predicted upfront",
+    ],
+    correctOptions: ["a", "c"],
+    explanation:
+      "Prompt chaining is a fixed sequence of steps, well suited to predictable, well-defined workflows — the per-file-plus-integration-pass code review is the guide's own example of this pattern. Generating subtasks dynamically based on discoveries describes adaptive decomposition instead, and no single strategy is always correct regardless of context.",
+    reinforce: "Review: Task Statement 1.6, characteristics of prompt chaining.",
+  },
+  {
+    id: "d1-28",
+    domain: "D1",
+    type: "multi",
+    scenario:
+      "Which two statements correctly describe dynamic adaptive task decomposition? (Select 2 responses)",
+    options: [
+      "Subtasks are generated based on what is discovered during the investigation, rather than fixed in advance",
+      "It suits open-ended tasks, like exploring an unfamiliar codebase, where the next useful step depends on findings",
+      "It should replace prompt chaining for every workflow, including short, fully predictable ones",
+      "The full sequence of steps is fixed before the task begins and never changes",
+    ],
+    correctOptions: ["a", "b"],
+    explanation:
+      "Dynamic adaptive decomposition generates subtasks based on discoveries, making it suited to open-ended investigation. It shouldn't replace prompt chaining universally — predictable workflows are better served by a fixed sequence — and having a fully fixed, unchanging sequence describes prompt chaining, not this strategy.",
+    reinforce: "Review: Task Statement 1.6, characteristics of dynamic adaptive decomposition.",
+  },
+  {
+    id: "d1-29",
+    domain: "D1",
+    scenario:
+      "Two engineers want to compare two different refactoring strategies for the same module, starting from the same completed codebase analysis, without redoing that analysis twice or having their explorations interfere with each other. What Claude Agent SDK session feature fits this need?",
+    options: [
+      "--resume with the same session name for both engineers",
+      "fork_session, to create independent branches from the shared analysis baseline so each strategy can be explored separately",
+      "Starting two entirely separate sessions from scratch, each re-analyzing the codebase independently",
+      "Running both strategies in the same session, one after the other",
+    ],
+    correct: "b",
+    explanation:
+      "fork_session is designed exactly for this: creating independent branches from a shared analysis baseline so divergent approaches can be explored separately, without redoing the shared analysis or having the explorations interfere with each other.",
+    reinforce: "Review: Task Statement 1.7, fork_session for exploring divergent approaches from a shared baseline.",
+    scenarioTag: "developer_productivity",
+  },
+  {
+    id: "d1-30",
+    domain: "D1",
+    scenario:
+      "A developer started an investigation into a flaky test suite yesterday, gave the session a name, and wants to continue exactly that investigation today without starting over or mixing it up with other ongoing work. What is the correct mechanism?",
+    options: [
+      "Start a brand new session and paste in yesterday's chat log manually",
+      "Use --resume <session-name> to continue that specific named session",
+      "Ask a coworker to summarize what was discussed yesterday from memory",
+      "There is no way to continue a previous Claude Code session",
+    ],
+    correct: "b",
+    explanation:
+      "Named session resumption via --resume <session-name> is the mechanism for continuing a specific prior conversation, keeping it distinct from other ongoing work rather than requiring a manual transcript replay or relying on someone's memory.",
+    reinforce: "Review: Task Statement 1.7, named session resumption with --resume.",
+    scenarioTag: "developer_productivity",
+  },
+  {
+    id: "d1-31",
+    domain: "D1",
+    scenario:
+      "A Claude Code session analyzed a codebase's dependency graph two weeks ago. Since then, a major dependency upgrade touched dozens of files, and the team isn't sure exactly which ones. Should the developer resume that old session to continue the work?",
+    options: [
+      "Yes, always resume — restarting always wastes more time than it saves",
+      "It's better to start a new session with a structured summary of what's still relevant, since resuming would carry forward extensively stale tool results from before the major dependency upgrade",
+      "Resume the session but ignore everything it says, defeating the purpose of resuming at all",
+      "Resume the session and assume the dependency upgrade didn't change anything important",
+    ],
+    correct: "b",
+    explanation:
+      "Starting a new session with a structured summary is more reliable than resuming with stale tool results — especially when a lot has changed (like a major dependency upgrade touching many unknown files) since the prior analysis, making much of the old session's tool output unreliable.",
+    reinforce: "Review: Task Statement 1.7, choosing a fresh session with a summary over resuming heavily stale context.",
+    scenarioTag: "developer_productivity",
+  },
+  {
+    id: "d1-32",
+    domain: "D1",
+    scenario:
+      "A developer resumes a named session that previously analyzed a module in depth. Only two files in that module have changed since then (the rest of the analysis is still valid). What is the most effective way to handle this when resuming?",
+    options: [
+      "Explicitly tell the agent which two specific files changed, so it can re-analyze just those rather than assuming everything is still accurate or re-exploring the whole module",
+      "Say nothing and let the agent naturally notice the changes on its own",
+      "Always re-run the full original analysis from scratch to be safe, even though most of it is unaffected",
+      "Start an entirely new, unrelated session instead of resuming",
+    ],
+    correct: "a",
+    explanation:
+      "When resuming a session after code changes, informing the agent about the specific files that changed enables targeted re-analysis of just those files — avoiding both the risk of assuming stale results are still accurate and the waste of a full unnecessary re-exploration.",
+    reinforce: "Review: Task Statement 1.7, informing a resumed session about specific file changes for targeted re-analysis.",
+  },
+  {
+    id: "d1-33",
+    domain: "D1",
+    type: "multi",
+    scenario:
+      "Which two statements correctly match a Claude Agent SDK session-management feature to its appropriate use case? (Select 2 responses)",
+    options: [
+      "Use fork_session when two team members want to explore different, divergent approaches starting from the same completed analysis",
+      "Use --resume <session-name> to continue a specific earlier investigation that hasn't been touched by unrelated work",
+      "Always resume a session rather than starting fresh, regardless of how stale its tool results have become",
+      "fork_session and --resume are interchangeable and can always be used for identical purposes",
+    ],
+    correctOptions: ["a", "b"],
+    explanation:
+      "fork_session fits divergent parallel exploration from a shared baseline, while --resume continues a specific named investigation. Neither claiming they're interchangeable, nor always preferring resumption regardless of staleness, matches the guide's actual guidance — starting fresh with a summary is sometimes the better choice.",
+    reinforce: "Review: Task Statement 1.7, matching session features (fork_session vs. --resume) to their use cases.",
+  },
+  {
+    id: "d1-34",
+    domain: "D1",
+    type: "multi",
+    scenario:
+      "Which two practices make resuming or continuing Claude Code work more reliable across sessions? (Select 2 responses)",
+    options: [
+      "Informing a resumed session about specific files that changed since its last analysis, for targeted re-analysis",
+      "Starting a new session with a structured summary instead of resuming, when prior tool results are heavily stale",
+      "Always trusting that a resumed session's earlier tool results are still accurate, no matter how much time has passed",
+      "Avoiding named sessions entirely, since unnamed sessions are more reliable to resume",
+    ],
+    correctOptions: ["a", "b"],
+    explanation:
+      "Reliable session continuity comes from informing the agent about specific changes when resuming, and from choosing a fresh session with a structured summary when prior results are too stale to trust — not from blindly trusting old results or avoiding the session-naming mechanism that makes targeted resumption possible in the first place.",
+    reinforce: "Review: Task Statement 1.7, reliable practices for session resumption and handoff.",
+  },
+  {
+    id: "d1-35",
+    domain: "D1",
+    scenario:
+      "A coordinator for a market-research pipeline decomposes 'analyze the competitive landscape' into exactly 2 fixed subagent tasks: 'search competitor pricing' and 'search competitor features.' The resulting report misses competitor hiring trends and funding news — topics the fixed decomposition never considered. What is the architectural issue?",
+    options: [
+      "The coordinator decomposed the topic too narrowly, leading to incomplete coverage of a broad research topic",
+      "The subagents were given too much autonomy",
+      "The report should have been written before any subagents were spawned",
+      "The pipeline needs more subagents regardless of what they research",
+    ],
+    correct: "a",
+    explanation:
+      "A known risk of coordinator-subagent orchestration is overly narrow task decomposition, which leaves broad topics incompletely covered. The fix isn't simply 'more subagents' — it's decomposing the topic to actually span its relevant subtopics.",
+    reinforce: "Review: Task Statement 1.2, risk of overly narrow task decomposition by the coordinator.",
+    scenarioTag: "multi_agent_research",
+  },
+  {
+    id: "d1-36",
+    domain: "D1",
+    scenario:
+      "A coordinator spawns 3 research subagents for 'summarize recent developments in battery technology,' but all 3 independently search and summarize the same handful of popular articles, producing heavily redundant findings. What should the coordinator do differently?",
+    options: [
+      "Partition the research scope across subagents — for example, assigning each a distinct subtopic or source type — to minimize duplicated work",
+      "Reduce the number of subagents to 1, since parallelism isn't helping",
+      "Instruct all 3 subagents to search for the exact same set of sources to ensure consistency",
+      "Merge the 3 redundant summaries without changes, since agreement across subagents indicates confidence",
+    ],
+    correct: "a",
+    explanation:
+      "When subagents aren't given distinct scope, they tend to converge on the same obvious sources, producing duplication instead of coverage. Partitioning the research scope — distinct subtopics or source types per subagent — is the coordinator's job to prevent this.",
+    reinforce: "Review: Task Statement 1.2, partitioning research scope across subagents to minimize duplication.",
+    scenarioTag: "multi_agent_research",
+  },
+  {
+    id: "d1-37",
+    domain: "D1",
+    scenario:
+      "A coordinator's first synthesis pass produces a report on 'the impact of remote work on urban real estate' that thoroughly covers residential trends but has almost nothing on commercial office space. What is the recommended coordinator behavior at this point?",
+    options: [
+      "Publish the report as-is, since residential coverage is already substantial",
+      "Evaluate the synthesis output for gaps, re-delegate to search/analysis subagents with a targeted query about commercial office space, then re-invoke synthesis once that gap is filled",
+      "Discard all findings and restart the entire pipeline from scratch",
+      "Ask the user to manually research the missing commercial office space section",
+    ],
+    correct: "b",
+    explanation:
+      "Coordinators should implement an iterative refinement loop: evaluate the synthesis output for gaps, re-delegate to relevant subagents with targeted follow-up queries addressing exactly what's missing, and re-invoke synthesis — rather than shipping incomplete coverage or discarding all the valid work already done.",
+    reinforce: "Review: Task Statement 1.2, iterative refinement loops for closing coverage gaps.",
+    scenarioTag: "multi_agent_research",
+  },
+  {
+    id: "d1-38",
+    domain: "D1",
+    scenario:
+      "Which of the following best describes the coordinator's core responsibilities in a hub-and-spoke multi-agent architecture?",
+    options: [
+      "Decomposing the task, delegating to appropriate subagents, aggregating their results, and deciding which subagents a given query actually needs",
+      "Only forwarding the user's message unmodified to every available subagent",
+      "Executing all the domain-specific work itself, using subagents purely as a logging mechanism",
+      "Selecting a single subagent at random for each request to balance load",
+    ],
+    correct: "a",
+    explanation:
+      "The coordinator's core responsibilities are task decomposition, delegation, result aggregation, and deciding which subagents a given query's complexity actually calls for — not blind broadcast to every subagent, self-executing the work, or random selection.",
+    reinforce: "Review: Task Statement 1.2, core coordinator responsibilities in hub-and-spoke orchestration.",
+  },
+  {
+    id: "d1-39",
+    domain: "D1",
+    type: "multi",
+    scenario:
+      "Which two practices describe good coordinator design in a multi-agent system? (Select 2 responses)",
+    options: [
+      "Partitioning research scope across subagents to reduce duplicated work",
+      "Always invoking every available subagent for every query, regardless of complexity",
+      "Evaluating synthesis output for gaps and re-delegating with targeted queries until coverage is sufficient",
+      "Letting subagents communicate results directly to each other, bypassing the coordinator, whenever convenient",
+    ],
+    correctOptions: ["a", "c"],
+    explanation:
+      "Good coordinator design partitions scope to avoid duplicated subagent work and iteratively closes coverage gaps by re-delegating targeted queries. Invoking every subagent regardless of need, and letting subagents bypass the coordinator, both undermine the hub-and-spoke pattern's efficiency and observability.",
+    reinforce: "Review: Task Statement 1.2, coordinator design practices.",
+  },
+  {
+    id: "d1-40",
+    domain: "D1",
+    scenario:
+      "A coordinator spawns a 'synthesis' subagent, defining its AgentDefinition with a specific description, a system prompt scoped to synthesis work, and a tool restriction that excludes web-search tools (since it should only synthesize what other subagents already found). What is this configuration an example of?",
+    options: [
+      "A misconfiguration — every subagent should have access to every tool for flexibility",
+      "Using AgentDefinition to scope each subagent type's description, system prompt, and tool restrictions to its specific role",
+      "An anti-pattern, since subagents shouldn't have system prompts of their own",
+      "An unnecessary step, since Claude ignores AgentDefinition restrictions in practice",
+    ],
+    correct: "b",
+    explanation:
+      "AgentDefinition configuration — description, system prompt, and tool restrictions per subagent type — is exactly how each subagent's role gets scoped, like restricting a synthesis-only subagent from web-search tools it doesn't need.",
+    reinforce: "Review: Task Statement 1.3, AgentDefinition configuration per subagent type.",
+    scenarioTag: "multi_agent_research",
+  },
+  {
+    id: "d1-41",
+    domain: "D1",
+    scenario:
+      "A coordinator has findings from a web-search subagent and a document-analysis subagent, and now needs a synthesis subagent to combine them into a report. What is the correct way to give the synthesis subagent what it needs?",
+    options: [
+      "Include the complete findings from both prior subagents directly in the synthesis subagent's prompt",
+      "Tell the synthesis subagent to re-run the same web search and document analysis itself",
+      "Assume the synthesis subagent automatically has access to the other subagents' conversation history",
+      "Give the synthesis subagent only a one-sentence summary of what the other subagents were asked to do, without their actual findings",
+    ],
+    correct: "a",
+    explanation:
+      "Since subagents don't automatically inherit other agents' context, the synthesis subagent needs the complete findings from the prior subagents included directly in its prompt — re-running the work or assuming automatic access would either waste effort or simply fail to give it what it needs.",
+    reinforce: "Review: Task Statement 1.3, including prior subagents' complete findings directly in the next subagent's prompt.",
+    scenarioTag: "multi_agent_research",
+  },
+  {
+    id: "d1-42",
+    domain: "D1",
+    scenario:
+      "A synthesis subagent receives a mix of factual claims and where they came from, but the source URLs and page numbers were pasted inline as part of the same free-text blob as the claims themselves. The final report ends up attributing several claims to the wrong sources. What structural change would prevent this?",
+    options: [
+      "Use a structured data format that separates claim content from metadata (source URL, document name, page number), so attribution isn't lost when combining findings",
+      "Ask the subagent to write more carefully next time",
+      "Remove all source citations from the report to avoid the risk of misattribution",
+      "Have the synthesis subagent guess the most likely source for each claim based on writing style",
+    ],
+    correct: "a",
+    explanation:
+      "Separating content from metadata using a structured format (rather than free-text blobs mixing claims and sources) is what preserves attribution reliably when context is passed between agents — guessing or removing citations doesn't solve the underlying structural problem.",
+    reinforce: "Review: Task Statement 1.3, structured data formats separating content from metadata to preserve attribution.",
+    scenarioTag: "multi_agent_research",
+  },
+  {
+    id: "d1-43",
+    domain: "D1",
+    scenario:
+      "A coordinator's prompt to a research subagent lists 15 numbered procedural steps to follow exactly, in order, with no room to deviate. When the subagent discovers the first source is a dead link, it has no guidance for what to do next except get stuck. What prompt design would have avoided this?",
+    options: [
+      "Specifying the research goal and quality criteria the subagent should meet, rather than a rigid step-by-step procedure — letting the subagent adapt to what it actually encounters",
+      "Adding even more numbered steps to cover every possible failure case in advance",
+      "Removing all guidance from the prompt entirely",
+      "Having the coordinator manually handle every dead link itself instead of delegating",
+    ],
+    correct: "a",
+    explanation:
+      "Coordinator prompts that specify goals and quality criteria — rather than rigid step-by-step procedures — enable subagents to adapt to what they actually encounter (like a dead link), instead of getting stuck outside a pre-scripted sequence.",
+    reinforce: "Review: Task Statement 1.3, specifying goals and quality criteria over step-by-step procedural instructions.",
+  },
+  {
+    id: "d1-44",
+    domain: "D1",
+    type: "multi",
+    scenario:
+      "Which two practices correctly describe how a coordinator should pass context and configure subagents in the Claude Agent SDK? (Select 2 responses)",
+    options: [
+      "Including complete prior findings directly in a subagent's prompt, since subagents don't automatically inherit other agents' context",
+      "Assuming all spawned subagents share the coordinator's full conversation history by default",
+      "Using structured formats that separate content from metadata to preserve source attribution across handoffs",
+      "Writing exhaustive step-by-step procedural instructions for every subagent to eliminate any need for judgment",
+    ],
+    correctOptions: ["a", "c"],
+    explanation:
+      "Subagents need relevant findings included explicitly in their prompts (since context isn't automatically inherited) and structured content/metadata separation to preserve attribution. Assuming automatic context sharing is factually wrong, and over-specifying rigid procedures removes the adaptability that goal-oriented prompts are meant to preserve.",
+    reinforce: "Review: Task Statement 1.3, subagent context passing and configuration practices.",
+  },
+  {
+    id: "d1-45",
+    domain: "D1",
+    scenario:
+      "A customer message says: 'My last order arrived damaged AND I was charged twice for it.' The agent has tools to handle damage claims and billing disputes separately. What is the best way to handle this multi-concern request?",
+    options: [
+      "Decompose the request into its distinct concerns (damage claim, duplicate charge), investigate each in parallel using shared context, then synthesize a single unified resolution",
+      "Only address the first concern mentioned and tell the customer to send a separate message for the second",
+      "Pick whichever concern seems more urgent and silently ignore the other",
+      "Escalate immediately to a human without attempting to resolve either concern",
+    ],
+    correct: "a",
+    explanation:
+      "Multi-concern customer requests should be decomposed into their distinct items, investigated in parallel using shared context, and then synthesized into one unified response — not handled partially, arbitrarily prioritized, or escalated by default when the agent has the tools to resolve both.",
+    reinforce: "Review: Task Statement 1.4, decomposing and resolving multi-concern requests.",
+    scenarioTag: "customer_support",
+  },
+  {
+    id: "d1-46",
+    domain: "D1",
+    scenario:
+      "An internal tool lets an agent adjust warehouse inventory counts. Company policy requires a manager-approval flag to be set before any adjustment above 500 units can be executed autonomously. The system prompt states this rule clearly, but audits find occasional adjustments above 500 units going through without the flag. What is the recommended fix?",
+    options: [
+      "Reword the system prompt rule to be even more explicit and repeated multiple times",
+      "Add a programmatic prerequisite that blocks the inventory-adjustment tool call above 500 units until the manager-approval flag is confirmed set",
+      "Remove the 500-unit threshold entirely so there's nothing to enforce",
+      "Trust that clearer wording will eventually reach 100% compliance",
+    ],
+    correct: "b",
+    explanation:
+      "Business-critical ordering requirements (like requiring approval before a large inventory change) need a programmatic prerequisite gate — prompt-based instructions, no matter how clearly worded, carry a non-zero failure rate that a deterministic block does not.",
+    reinforce: "Review: Task Statement 1.4, programmatic prerequisites for business-critical operation ordering.",
+  },
+  {
+    id: "d1-47",
+    domain: "D1",
+    scenario:
+      "A team is confident that as long as the system prompt is worded carefully enough, an agent will always verify a user's identity before revealing account details. After several prompt rewrites, a small number of failures still occur under unusual phrasing. What does this repeated pattern indicate?",
+    options: [
+      "The prompt just needs one more rewrite and will eventually reach zero failures",
+      "Prompt-based compliance is inherently probabilistic and has a non-zero failure rate — for requirements where failure has real cost, only programmatic enforcement (like a hook or a gate) provides a deterministic guarantee",
+      "The failures are unrelated to enforcement design and are just random model noise to be ignored",
+      "The team should switch to an entirely different model and keep the same enforcement approach",
+    ],
+    correct: "b",
+    explanation:
+      "No amount of prompt wording eliminates the fundamentally probabilistic nature of instruction-following. When failures have real cost, the guide's recommendation is programmatic enforcement (deterministic), not further iteration on prompt wording alone.",
+    reinforce: "Review: Task Statement 1.4, prompt-based compliance as inherently probabilistic vs. deterministic enforcement.",
+  },
+  {
+    id: "d1-48",
+    domain: "D1",
+    type: "multi",
+    scenario:
+      "Which two statements correctly describe enforcement and handoff design for multi-step agentic workflows? (Select 2 responses)",
+    options: [
+      "Programmatic prerequisites (like blocking a downstream tool call until a required step completes) provide guarantees prompt instructions alone cannot",
+      "Multi-concern requests should be handled one concern at a time across separate, unrelated conversations",
+      "A structured handoff to a human should include enough context (like root cause and recommended action) that the human doesn't need to reconstruct it themselves",
+      "Once a system prompt clearly states a compliance rule, no further enforcement mechanism is needed",
+    ],
+    correctOptions: ["a", "c"],
+    explanation:
+      "Programmatic prerequisites give deterministic guarantees, and structured handoffs should carry enough context for a human to act without reconstructing it. Splitting a multi-concern request across unrelated conversations, and trusting a prompt statement alone as sufficient enforcement, are both the anti-patterns this Task Statement warns against.",
+    reinforce: "Review: Task Statement 1.4, enforcement and handoff design principles.",
+  },
+  {
+    id: "d1-49",
+    domain: "D1",
+    scenario:
+      "Why does the exam guide recommend using Agent SDK hooks, rather than relying solely on system-prompt instructions, when a business rule absolutely must be enforced every time?",
+    options: [
+      "Hooks provide a deterministic guarantee by intercepting tool calls programmatically, while prompt instructions only produce probabilistic compliance that can fail even when clearly written",
+      "Hooks make the model respond faster, which is the only reason to prefer them",
+      "System prompts cannot contain business rules at all, so hooks are the only option",
+      "Hooks and prompt instructions are functionally identical, so the choice doesn't matter",
+    ],
+    correct: "a",
+    explanation:
+      "The core distinction is deterministic guarantee (hooks intercepting tool calls programmatically) versus probabilistic compliance (prompt instructions, which can fail even when well-written). That reliability gap — not speed — is why hooks are recommended for must-always-enforce rules.",
+    reinforce: "Review: Task Statement 1.5, hooks for deterministic guarantees vs. probabilistic prompt compliance.",
+  },
+  {
+    id: "d1-50",
+    domain: "D1",
+    scenario:
+      "An agent pulls order status from three MCP tools that each represent status differently: one uses numeric codes (1, 2, 3), another uses short strings ('pending', 'shipped'), and a third uses full sentences. The agent frequently misreads status across systems. What is the recommended fix?",
+    options: [
+      "A PostToolUse hook that normalizes all three status representations into one consistent format before the agent reasons about them",
+      "Ask the model to keep track of which system uses which format in its own memory",
+      "Standardize on whichever format is used by the newest of the three backend systems and ignore the others",
+      "Remove two of the three status sources to reduce inconsistency",
+    ],
+    correct: "a",
+    explanation:
+      "A PostToolUse hook normalizing heterogeneous status representations (numeric codes, short strings, sentences) into a consistent format before the model processes them is the deterministic fix — relying on the model to track format differences on its own is unreliable.",
+    reinforce: "Review: Task Statement 1.5, PostToolUse hooks normalizing heterogeneous data formats.",
+  },
+  {
+    id: "d1-51",
+    domain: "D1",
+    scenario:
+      "An internal agent has access to a delete_customer_record tool. Company policy requires a supervisor-approval flag before any deletion can proceed. What is the recommended way to enforce this?",
+    options: [
+      "A tool call interception hook that blocks delete_customer_record unless the supervisor-approval flag is set, redirecting to manual review otherwise",
+      "A note in the system prompt asking the agent to 'be careful' with deletions",
+      "Trusting that the agent will rarely need to call this tool, so enforcement isn't necessary",
+      "Removing all error messages related to the deletion tool so the agent doesn't get confused",
+    ],
+    correct: "a",
+    explanation:
+      "A tool call interception hook blocking the deletion until the required approval flag is set — and redirecting to manual review otherwise — is the deterministic enforcement mechanism for a high-consequence action like this, not a soft prompt reminder.",
+    reinforce: "Review: Task Statement 1.5, tool call interception hooks for high-consequence actions.",
+  },
+  {
+    id: "d1-52",
+    domain: "D1",
+    type: "multi",
+    scenario:
+      "Which two are correct characteristics of Agent SDK hooks as described in the exam guide? (Select 2 responses)",
+    options: [
+      "PostToolUse hooks can transform or normalize tool results before the model processes them",
+      "Hooks intercepting outgoing tool calls can enforce compliance rules, like blocking an action above a policy threshold",
+      "Hooks are optional stylistic sugar with no reliability advantage over well-written prompt instructions",
+      "Hooks can only be used to log data and have no ability to block or alter agent behavior",
+    ],
+    correctOptions: ["a", "b"],
+    explanation:
+      "PostToolUse hooks can transform/normalize results, and hooks intercepting outgoing tool calls can enforce compliance rules like blocking policy-violating actions. Hooks provide deterministic guarantees prompts don't (the opposite of 'no reliability advantage'), and they can actively block or alter behavior, not just log.",
+    reinforce: "Review: Task Statement 1.5, characteristics and capabilities of Agent SDK hooks.",
+  },
+  {
+    id: "d1-53",
+    domain: "D1",
+    scenario:
+      "A team's system prompt tells their coding agent to 'always double-check before deleting files.' Despite this instruction, the agent occasionally deletes files that shouldn't have been touched, under ambiguous instructions from the user. What change would reliably prevent this?",
+    options: [
+      "A hook that intercepts delete/write operations on protected paths and blocks or requires confirmation before they proceed, rather than relying on the prompt instruction alone",
+      "Repeating the 'double-check before deleting' instruction twice in the system prompt for emphasis",
+      "Removing the delete capability from the agent's tools entirely, even when legitimate deletions are needed",
+      "Increasing the model's context window so it 'remembers' to double-check",
+    ],
+    correct: "a",
+    explanation:
+      "A prompt instruction to 'double-check' is still probabilistic compliance. A hook that intercepts the actual delete/write operation and enforces a check or confirmation gives a deterministic guarantee the prompt instruction alone cannot — without removing legitimate delete capability altogether.",
+    reinforce: "Review: Task Statement 1.5, hooks vs. prompt instructions for reliably preventing unwanted actions.",
+    scenarioTag: "code_generation",
+  },
+  {
+    id: "d1-54",
+    domain: "D1",
+    scenario:
+      "A team is deciding whether to enforce a critical business rule via an Agent SDK hook or via a very carefully worded system prompt instruction. What should determine their choice?",
+    options: [
+      "Whether the failure cost of a missed enforcement is high enough to require a deterministic guarantee (favoring a hook) versus a case where occasional probabilistic drift is an acceptable tradeoff (where prompt guidance may suffice)",
+      "Whichever approach is faster to implement, regardless of the rule's consequences",
+      "Hooks should never be used for business rules — they are reserved exclusively for logging",
+      "System prompts should never be used to describe any rule, since hooks always replace them entirely",
+    ],
+    correct: "a",
+    explanation:
+      "The deciding factor is the cost of a compliance failure: when it's high (financial operations, data deletion, identity verification), a hook's deterministic guarantee is warranted. Choosing based purely on implementation speed, or treating one mechanism as universally forbidden, misses the actual tradeoff the guide describes.",
+    reinforce: "Review: Task Statement 1.5, choosing between hooks and prompt-based guidance based on failure cost.",
+  },
+  {
     id: "d2-5",
     domain: "D2",
     scenario:
@@ -825,8 +1491,8 @@ const insertDomain = db.prepare(
 );
 
 const insertQuestion = db.prepare(
-  `INSERT INTO questions (id, domain_id, scenario, option_a, option_b, option_c, option_d, correct_option, question_type, correct_options, select_count, explanation, reinforce)
-   VALUES (@id, @domain_id, @scenario, @option_a, @option_b, @option_c, @option_d, @correct_option, @question_type, @correct_options, @select_count, @explanation, @reinforce)
+  `INSERT INTO questions (id, domain_id, scenario, option_a, option_b, option_c, option_d, correct_option, question_type, correct_options, select_count, scenario_tag, explanation, reinforce)
+   VALUES (@id, @domain_id, @scenario, @option_a, @option_b, @option_c, @option_d, @correct_option, @question_type, @correct_options, @select_count, @scenario_tag, @explanation, @reinforce)
    ON CONFLICT(id) DO UPDATE SET
      domain_id = excluded.domain_id,
      scenario = excluded.scenario,
@@ -838,6 +1504,7 @@ const insertQuestion = db.prepare(
      question_type = excluded.question_type,
      correct_options = excluded.correct_options,
      select_count = excluded.select_count,
+     scenario_tag = excluded.scenario_tag,
      explanation = excluded.explanation,
      reinforce = excluded.reinforce`
 );
@@ -860,6 +1527,7 @@ const seed = db.transaction(() => {
       question_type: q.type ?? "single",
       correct_options: isMulti ? JSON.stringify(q.correctOptions) : null,
       select_count: isMulti ? q.correctOptions!.length : 1,
+      scenario_tag: q.scenarioTag ?? null,
       explanation: q.explanation,
       reinforce: q.reinforce,
     });
